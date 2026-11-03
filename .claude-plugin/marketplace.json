@@ -1,0 +1,18 @@
+{
+  "name": "claude-motion-agent",
+  "owner": {
+    "name": "Mert Vakitsayan"
+  },
+  "metadata": {
+    "description": "Claude Code plugins from the claude-motion-agent project.",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "reel-studio",
+      "source": "./plugins/reel-studio",
+      "description": "Effect-heavy vertical reels from raw footage, with hits synced to the music's beats. Renders locally with Mirage Tesseract.",
+      "version": "1.0.0"
+    }
+  ]
+}

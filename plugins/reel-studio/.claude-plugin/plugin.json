@@ -1,0 +1,13 @@
+{
+  "$schema": "https://anthropic.com/claude-code/plugin.schema.json",
+  "name": "reel-studio",
+  "version": "1.0.0",
+  "description": "Effect-heavy 1080x1920 reels from raw action footage: whip pans, RGB split, glitch, impact punches, beat-synced hits, League Gothic + Space Mono typography. Renders locally with Mirage Tesseract.",
+  "author": {
+    "name": "Mert Vakitsayan"
+  },
+  "keywords": ["video", "reels", "instagram", "tesseract", "editing", "motion"],
+  "skills": [
+    "./"
+  ]
+}

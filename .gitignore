@@ -1,0 +1,18 @@
+# secrets
+.env
+.env.*
+!.env.example
+
+# runtime and job output
+.runtime/
+projects/
+
+# dependencies and builds
+node_modules/
+dashboard/node_modules/
+out/
+__pycache__/
+*.pyc
+
+# OS
+.DS_Store

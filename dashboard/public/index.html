@@ -1,0 +1,724 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Motion Agent</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#2e2f31; --panel:#36373a; --panel2:#323336; --deep:#262729; --line:#4a4b4f; --line2:#3f4043;
+  --text:#e8e7e3; --muted:#a1a2a6; --dim:#7b7c80;
+  --tally:#e5383b; --amber:#f2b134; --ok:#8fbf86; --err:#ef7a6b;
+  --sans:"Instrument Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--text);font:14px/1.5 var(--sans);display:grid;grid-template-rows:auto 1fr;overflow:hidden}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;border:1px solid var(--line);background:var(--panel);border-radius:7px;padding:6px 12px}
+button:hover{border-color:#66676c}
+button:disabled{opacity:.45;cursor:default}
+button.primary{background:var(--text);color:#232426;border-color:var(--text);font-weight:600}
+button.primary:hover{background:#fff}
+button.ghost{background:none;border-color:transparent;color:var(--muted);padding:4px 8px}
+button.ghost:hover{color:var(--text);border-color:var(--line)}
+button.danger{border-color:var(--tally);color:#ffb6b2;background:rgba(229,56,59,.08)}
+:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+input,select,textarea{background:var(--panel2);border:1px solid var(--line);border-radius:7px;padding:7px 10px}
+code,pre,.mono{font-family:var(--mono);font-size:12.5px}
+
+/* top bar */
+header{display:flex;align-items:center;gap:10px;padding:9px 16px;border-bottom:1px solid var(--line);background:var(--panel2)}
+header h1{font-size:15px;font-weight:600;margin:0 8px 0 0;white-space:nowrap}
+#jobSel{max-width:300px;font-weight:500}
+header .spacer{flex:1}
+.conn{width:9px;height:9px;border-radius:50%;background:var(--dim);flex:none}
+.conn.ok{background:var(--ok)} .conn.wait{background:var(--amber)} .conn.bad{background:var(--tally)}
+
+main{display:grid;grid-template-columns:minmax(420px,1fr) minmax(340px,42%);min-height:0}
+main>section{min-height:0;display:flex;flex-direction:column}
+main>section+section{border-left:1px solid var(--line)}
+
+/* tally + timeline */
+.tally{position:relative;padding:12px 18px 0;border-bottom:1px solid var(--line);background:var(--panel2)}
+.trow{display:flex;align-items:center;gap:12px;min-height:30px}
+.lamp{width:11px;height:11px;border-radius:50%;background:#58595d;flex:none}
+.busy .lamp{background:var(--tally);animation:pulse 1.6s ease-in-out infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(229,56,59,.55)}50%{box-shadow:0 0 14px 4px rgba(229,56,59,.45)}}
+.jt{font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.act{color:var(--muted);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1}
+.busy .act{color:var(--text)}
+.tc{font-family:var(--mono);font-size:13px;color:var(--dim);font-variant-numeric:tabular-nums}
+.busy .tc{color:#ffb6b2}
+.timeline{position:relative;height:22px;margin:10px -18px 0;overflow:hidden;opacity:.25;transition:opacity .3s}
+.busy .timeline{opacity:1}
+.ticks{position:absolute;inset:0;background:
+  repeating-linear-gradient(90deg,rgba(232,231,227,.28) 0 1px,transparent 1px 12px),
+  repeating-linear-gradient(90deg,rgba(232,231,227,.5) 0 1px,transparent 1px 60px);
+  background-size:12px 7px,60px 13px;background-repeat:repeat-x;background-position:0 100%,0 100%}
+.busy .ticks{animation:scrub 2.4s linear infinite}
+@keyframes scrub{to{background-position:-60px 100%,-60px 100%}}
+.clips{position:absolute;left:0;right:0;top:3px;height:7px;background:
+  linear-gradient(90deg,transparent 0 6%,rgba(242,177,52,.55) 6% 21%,transparent 21% 24%,rgba(143,191,134,.5) 24% 47%,transparent 47% 50%,rgba(242,177,52,.45) 50% 63%,transparent 63% 67%,rgba(160,170,230,.45) 67% 92%,transparent 92%);
+  background-size:480px 7px;background-repeat:repeat-x}
+.busy .clips{animation:clipscroll 6s linear infinite}
+@keyframes clipscroll{to{background-position:-480px 0}}
+.head{position:absolute;left:50%;top:0;bottom:0;width:2px;background:var(--tally);box-shadow:0 0 8px rgba(229,56,59,.7);opacity:0}
+.head::before{content:"";position:absolute;top:0;left:-4px;border:5px solid transparent;border-top-color:var(--tally)}
+.busy .head{opacity:1}
+
+/* chat */
+#log{flex:1;overflow:auto;padding:20px 22px 10px;scroll-behavior:smooth}
+.msg{max-width:74ch;margin:0 0 14px;animation:in .18s ease-out}
+@keyframes in{from{opacity:0;transform:translateY(4px)}}
+.msg.user{margin-left:auto;width:fit-content;max-width:min(74ch,85%);background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:9px 13px;white-space:pre-wrap}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;background:var(--deep);border:1px solid var(--line2);border-radius:999px;padding:3px 10px;max-width:260px}
+.chip span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chip button{padding:0 2px;border:0;background:none;color:var(--dim);line-height:1}
+.agent p{margin:0 0 8px}
+.agent h3,.agent h4{font-size:14px;margin:12px 0 6px}
+.agent ul,.agent ol{margin:4px 0 8px;padding-left:22px}
+.agent pre{background:var(--deep);border:1px solid var(--line2);border-radius:7px;padding:10px;overflow:auto}
+.agent code{background:var(--deep);padding:1px 4px;border-radius:4px}
+.agent pre code{background:none;padding:0}
+.agent table{border-collapse:collapse;margin:6px 0 10px;font-size:13px;display:block;overflow:auto}
+.agent td,.agent th{border:1px solid var(--line);padding:4px 8px;text-align:left;vertical-align:top}
+.agent a{color:var(--text)}
+.note{color:var(--muted);font-size:13px;margin:0 0 14px}
+.err{color:var(--err);font-size:13px;margin:0 0 14px;max-width:74ch;white-space:pre-wrap}
+.done{color:var(--dim);font-size:12.5px;margin:2px 0 20px}
+
+.steps{max-width:74ch;margin:0 0 12px;border:1px solid var(--line2);border-radius:9px;background:var(--panel2)}
+.steps>summary{list-style:none;display:flex;align-items:center;gap:10px;padding:8px 12px;cursor:pointer;color:var(--muted);font-size:13px}
+.steps>summary::-webkit-details-marker{display:none}
+.steps .n{color:var(--text);font-weight:500;white-space:nowrap}
+.steps .last{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.spin{width:13px;height:13px;border-radius:50%;border:2px solid rgba(242,177,52,.25);border-top-color:var(--amber);flex:none;animation:rot .8s linear infinite}
+@keyframes rot{to{transform:rotate(360deg)}}
+.tick{width:13px;height:13px;flex:none;position:relative}
+.tick::after{content:"";position:absolute;left:4px;top:1px;width:4px;height:8px;border:solid var(--ok);border-width:0 2px 2px 0;transform:rotate(45deg)}
+.steps.fail .tick::after{border-color:var(--err)}
+.steps ol{list-style:none;margin:0;padding:0 12px 8px}
+.step summary{list-style:none;display:flex;gap:10px;align-items:baseline;cursor:pointer;padding:3px 0;font-size:12.5px;color:var(--muted)}
+.step summary::-webkit-details-marker{display:none}
+.step .tn{font-family:var(--mono);font-size:11.5px;color:var(--text);min-width:44px}
+.step .ts{font-family:var(--mono);font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.step .d{width:6px;height:6px;border-radius:50%;background:var(--amber);flex:none;align-self:center}
+.step.ok .d{background:var(--ok)} .step.bad .d{background:var(--err)}
+.step pre{margin:4px 0 8px 16px;background:var(--deep);border:1px solid var(--line2);border-radius:6px;padding:8px 10px;max-height:300px;overflow:auto;white-space:pre-wrap;word-break:break-word}
+
+.thinking{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:13px;margin:0 0 14px}
+.bars{display:flex;gap:3px;align-items:flex-end;height:14px}
+.bars i{width:3px;background:var(--tally);border-radius:2px;animation:eq 1s ease-in-out infinite}
+.bars i:nth-child(2){animation-delay:.15s}.bars i:nth-child(3){animation-delay:.3s}.bars i:nth-child(4){animation-delay:.45s}
+@keyframes eq{0%,100%{height:3px}50%{height:14px}}
+
+.ask{border:1px solid var(--amber);border-radius:10px;padding:12px 14px;margin:6px 0 14px;max-width:74ch;background:rgba(242,177,52,.06)}
+.ask h4{margin:0 0 6px;font-size:14px;color:var(--amber);font-weight:600}
+.qa{margin:10px 0 12px}
+.qa .q{font-weight:600;margin-bottom:6px}
+.opt{display:flex;gap:10px;align-items:flex-start;padding:7px 10px;border:1px solid var(--line);border-radius:7px;margin-bottom:6px;cursor:pointer}
+.opt:hover{border-color:#66676c}
+.opt input{margin-top:4px;accent-color:var(--amber)}
+.opt small{display:block;color:var(--muted)}
+.qa .other{width:100%}
+.ask .acts{display:flex;gap:8px}
+.ask.closed{border-color:var(--line);background:none}
+.ask.closed h4{color:var(--muted)}
+.ask .chosen{font-size:13px;color:var(--muted)}
+
+/* empty state */
+.empty{max-width:60ch;margin:6vh auto;text-align:left}
+.empty h2{font-size:20px;font-weight:600;margin:0 0 6px}
+.empty p{color:var(--muted);margin:0 0 16px}
+.dropzone{border:1.5px dashed var(--line);border-radius:12px;padding:28px;text-align:center;color:var(--muted);cursor:pointer;margin-bottom:16px;transition:border-color .2s,background .2s}
+.dropzone:hover{border-color:var(--amber);background:rgba(242,177,52,.04)}
+.dropzone strong{display:block;color:var(--text);font-size:15px;margin-bottom:4px}
+.ex{display:flex;flex-direction:column;gap:8px}
+.ex button{text-align:left;background:var(--panel2);color:var(--muted)}
+.ex button:hover{color:var(--text)}
+.newform{display:grid;grid-template-columns:1fr 1fr auto;gap:8px;margin-top:8px}
+
+/* composer */
+.composer{border-top:1px solid var(--line);padding:10px 16px 14px;background:var(--panel2)}
+.composer .chips{margin:0 0 8px}
+.crow{display:flex;gap:8px;align-items:flex-end}
+.crow textarea{flex:1;resize:none;min-height:44px;max-height:220px;line-height:1.45}
+.prog{height:2px;background:var(--amber);border-radius:2px;margin-top:2px;transition:width .2s}
+
+/* outputs */
+.monitor{height:52%;min-height:220px;display:flex;flex-direction:column;background:#1f2022;border-bottom:1px solid var(--line)}
+.mbar{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid #2c2d30;font-size:12.5px;color:var(--muted)}
+.mbar .fn{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)}
+.mbar a,.mbar button{font-size:12.5px;padding:3px 9px;color:var(--text);text-decoration:none;border:1px solid var(--line);border-radius:6px;background:var(--panel)}
+.screen{flex:1;display:flex;align-items:center;justify-content:center;min-height:0;padding:10px}
+.screen video,.screen img{max-width:100%;max-height:100%;display:block;border-radius:4px}
+.screen .hint{color:var(--dim);font-size:13px;text-align:center;max-width:34ch}
+.tabs{display:flex;gap:4px;padding:10px 12px 6px}
+.tabs button{background:none;border-color:transparent;color:var(--muted);padding:4px 10px;font-size:13px}
+.tabs button.on{background:var(--panel);border-color:var(--line);color:var(--text)}
+.tabs .cost{margin-left:auto;color:var(--dim);font-size:12.5px;align-self:center}
+#grid{flex:1;overflow:auto;padding:4px 12px 12px;display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:8px;align-content:start}
+.th{position:relative;aspect-ratio:9/12;background:var(--deep);border:1px solid var(--line2);border-radius:7px;overflow:hidden;cursor:pointer;padding:0}
+.th.on{border-color:var(--text)}
+.th video,.th img{width:100%;height:100%;object-fit:cover;display:block}
+.th .cap{position:absolute;left:0;right:0;bottom:0;padding:14px 6px 4px;font-size:11px;color:#fff;text-align:left;background:linear-gradient(transparent,rgba(0,0,0,.75));white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.th .aud{display:flex;align-items:center;justify-content:center;height:100%;color:var(--muted);font-size:12px}
+.gempty{grid-column:1/-1;color:var(--dim);font-size:13px;padding:8px 2px}
+
+/* drag and drop + dialogs */
+#drop{position:fixed;inset:0;background:rgba(30,31,33,.85);display:none;align-items:center;justify-content:center;z-index:50;pointer-events:none}
+#drop div{border:2px dashed var(--amber);border-radius:16px;padding:40px 60px;font-size:18px;font-weight:600}
+body.dragging #drop{display:flex}
+dialog{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:12px;padding:22px 24px;max-width:560px;width:calc(100% - 32px)}
+dialog::backdrop{background:rgba(20,20,22,.6)}
+dialog h2{margin:0 0 6px;font-size:17px;font-weight:600}
+dialog p{color:var(--muted);margin:0 0 14px}
+dialog label{display:block;font-size:13px;color:var(--muted);margin:10px 0 4px}
+dialog input{width:100%}
+dialog .actions{display:flex;gap:8px;justify-content:flex-end;margin-top:18px}
+.meta{font-family:var(--mono);font-size:12.5px;color:var(--muted);margin-top:8px;min-height:18px}
+.meta.bad{color:var(--err)} .meta.good{color:var(--ok)}
+.keyrow{border-top:1px solid var(--line2);padding-top:12px;margin-top:12px}
+.keyrow:first-of-type{border-top:0;padding-top:0;margin-top:0}
+.keyrow h3{margin:0 0 2px;font-size:14px;font-weight:600}
+.keyrow .krow{display:flex;gap:8px;margin-top:6px}
+.keyrow .krow input{flex:1}
+dialog a{color:var(--text)}
+
+@media (max-width:980px){main{grid-template-columns:1fr}main>section+section{display:none}}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Motion Agent</h1>
+  <select id="jobSel" aria-label="Select job"></select>
+  <button id="newBtn">New job</button>
+  <div class="spacer"></div>
+  <select id="model" aria-label="Model"></select>
+  <button class="ghost" id="keyBtn">Keys</button>
+  <span class="conn" id="conn" title="Setup status"></span>
+</header>
+
+<main>
+  <section>
+    <div class="tally" id="tally">
+      <div class="trow">
+        <span class="lamp" aria-hidden="true"></span>
+        <span class="jt" id="jt">Motion Agent</span>
+        <span class="act" id="act"></span>
+        <span class="tc" id="tc">00:00:00</span>
+        <button class="ghost" id="resetBtn" hidden title="The agent forgets this job's conversation; the files stay where they are">Reset</button>
+      </div>
+      <div class="timeline" aria-hidden="true"><div class="clips"></div><div class="ticks"></div><div class="head"></div></div>
+    </div>
+    <div id="log"></div>
+    <div class="composer">
+      <div class="chips" id="pend"></div>
+      <div class="crow">
+        <button id="attachBtn" title="Add a competitor or reference video">Add video</button>
+        <textarea id="input" rows="2" placeholder="What should the agent do? Example: Analyze this video and make a similar one for MyApp. Enter sends."></textarea>
+        <button class="primary" id="sendBtn">Send</button>
+        <button class="danger" id="stopBtn" hidden>Stop</button>
+      </div>
+      <input type="file" id="fileIn" accept="video/*,image/*,audio/*" multiple hidden>
+    </div>
+  </section>
+
+  <section>
+    <div class="monitor">
+      <div class="mbar"><span class="fn" id="mName">Output</span><button id="revealBtn" hidden>Show in Finder</button><a id="dlBtn" hidden download>Download</a></div>
+      <div class="screen" id="screen"><span class="hint">Videos and images the agent makes will show up here.</span></div>
+    </div>
+    <div class="tabs" id="tabs">
+      <button data-g="final" class="on">Final</button>
+      <button data-g="gen">Generated</button>
+      <button data-g="ref">Reference</button>
+      <button data-g="work">Work</button>
+      <span class="cost" id="jobCost"></span>
+    </div>
+    <div id="grid"></div>
+  </section>
+</main>
+
+<div id="drop"><div>Drop the video to add it to this job</div></div>
+
+<dialog id="newDlg">
+  <h2>New job</h2>
+  <p>Each job works in its own folder: <span class="mono">projects/App/CODE-AI</span>.</p>
+  <label for="nApp">App</label>
+  <input id="nApp" list="appNames" placeholder="Example: MyApp">
+  <datalist id="appNames"></datalist>
+  <label for="nCode">Creative code (optional)</label>
+  <input id="nCode" placeholder="Example: APP101. Leave empty to get one automatically.">
+  <div class="meta bad" id="nErr"></div>
+  <div class="actions"><button id="nCancel">Cancel</button><button class="primary" id="nOk">Create job</button></div>
+</dialog>
+
+<dialog id="keyDlg">
+  <h2>API keys</h2>
+  <p>Keys stay on this computer in the project's <span class="mono">.env</span> file. Each key is tested before it is saved.</p>
+  <div class="keyrow" data-provider="fal">
+    <h3>fal.ai</h3>
+    <p style="margin:0">Images, video, voice and analysis. Get a key at <a href="https://fal.ai/dashboard/keys" target="_blank" rel="noopener">fal.ai/dashboard/keys</a>.</p>
+    <div class="krow"><input type="password" autocomplete="off" placeholder="Paste your fal.ai key" style="font-family:var(--mono)"><button class="primary">Test and save</button></div>
+    <div class="meta"></div>
+  </div>
+  <div class="keyrow" data-provider="anthropic">
+    <h3>Anthropic</h3>
+    <p style="margin:0">Runs the Claude agent. Get a key at <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>.</p>
+    <div class="krow"><input type="password" autocomplete="off" placeholder="Paste your Anthropic API key" style="font-family:var(--mono)"><button class="primary">Test and save</button></div>
+    <div class="meta"></div>
+  </div>
+  <div class="actions"><button id="keyClose">Close</button></div>
+</dialog>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+async function api(url, opts = {}) {
+  const r = await fetch(url, { ...opts, headers: { 'Content-Type': 'application/json' }, body: opts.body ? JSON.stringify(opts.body) : undefined });
+  const data = (r.headers.get('content-type') || '').includes('json') ? await r.json() : null;
+  if (!r.ok) throw new Error(data?.error || `Error ${r.status}`);
+  return data;
+}
+const tc = (ms) => { const s = Math.max(0, Math.floor(ms / 1000)); return [s / 3600, (s % 3600) / 60, s % 60].map((x) => String(Math.floor(x)).padStart(2, '0')).join(':'); };
+const dur = (ms) => { const s = Math.round(ms / 1000); return s < 60 ? `${s} s` : `${Math.floor(s / 60)} min ${s % 60} s`; };
+const usd = (v) => `$${(v || 0).toFixed(2)}`;
+const base = (p) => String(p || '').split('/').pop();
+
+let known = null;
+let status = null, jobs = [], cur = null, busySince = null, tickT = null, isBusy = false;
+let live = null, liveText = '', group = null, pendingFiles = [], media = [], tab = 'final', selMedia = null, thinkingEl = null;
+const toolEls = new Map();
+
+// ---------- markdown ----------
+function md(src) {
+  const blocks = []; src = String(src).replace(/```[^\n]*\n([\s\S]*?)```/g, (_, c) => { blocks.push(c); return `\u0000${blocks.length - 1}\u0000`; });
+  const inl = (t) => esc(t).replace(/`([^`]+)`/g, '<code>$1</code>').replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>').replace(/\[([^\]]+)\]\((https?:[^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  const L = src.split('\n'); let out = '', i = 0;
+  const isList = (l) => /^\s*([-*]|\d+[.)])\s+/.test(l), isRow = (l) => /^\s*\|.*\|\s*$/.test(l);
+  while (i < L.length) {
+    const l = L[i];
+    if (/^\u0000\d+\u0000$/.test(l.trim())) { out += `<pre><code>${esc(blocks[+l.trim().slice(1, -1)])}</code></pre>`; i++; continue; }
+    if (isRow(l) && /^\s*\|?\s*:?-{2,}/.test(L[i + 1] || '')) {
+      const row = (r) => r.trim().replace(/^\||\|$/g, '').split('|').map((c) => c.trim());
+      let t = '<table><tr>' + row(l).map((c) => `<th>${inl(c)}</th>`).join('') + '</tr>'; i += 2;
+      while (i < L.length && isRow(L[i])) { t += '<tr>' + row(L[i]).map((c) => `<td>${inl(c)}</td>`).join('') + '</tr>'; i++; }
+      out += t + '</table>'; continue;
+    }
+    let m;
+    if ((m = l.match(/^(#{1,4})\s+(.*)/))) { const h = m[1].length < 3 ? 3 : 4; out += `<h${h}>${inl(m[2])}</h${h}>`; i++; continue; }
+    if (isList(l)) {
+      const ord = /^\s*\d/.test(l); let it = '';
+      while (i < L.length && isList(L[i])) { it += `<li>${inl(L[i].replace(/^\s*([-*]|\d+[.)])\s+/, ''))}</li>`; i++; }
+      out += ord ? `<ol>${it}</ol>` : `<ul>${it}</ul>`; continue;
+    }
+    if (!l.trim()) { i++; continue; }
+    let p = l; i++;
+    while (i < L.length && L[i].trim() && !/^#{1,4}\s/.test(L[i]) && !isList(L[i]) && !isRow(L[i]) && !/^\u0000/.test(L[i].trim())) p += '\n' + L[i++];
+    out += `<p>${inl(p).replace(/\n/g, '<br>')}</p>`;
+  }
+  return out;
+}
+
+// ---------- activity text ----------
+function activity(name, summary) {
+  const s = summary || '';
+  if (name === 'Bash') {
+    let m;
+    if (/\bfal\s+analyze\b/.test(s)) return 'Analyzing the reference video';
+    if ((m = s.match(/\bfal\s+run\s+(\S+)/))) {
+      const slug = m[1];
+      const kind = /video|veo|kling|seedance|sora|hailuo/.test(slug) ? 'video' : /speech|tts/.test(slug) ? 'voiceover' : /whisper|wizper|speech-to-text|scribe/.test(slug) ? 'transcript' : 'image';
+      return `Generating ${kind} on fal: ${slug}`;
+    }
+    if (/\bfal\s+wait\b/.test(s)) return 'Waiting for fal generation';
+    if (/\bfal\s+(schema|models)\b/.test(s)) return 'Looking up fal models';
+    if (/\bfal\s+ask\b/.test(s)) return 'Asking a vision model';
+    if (/\bfal\s+upload\b/.test(s)) return 'Uploading to fal';
+    if (/remotion/.test(s) && /render/.test(s)) return 'Rendering with Remotion';
+    if (/\bnpm\s+(i|install|ci)\b/.test(s)) return 'Installing packages';
+    if (/deliver|verify_delivery/.test(s)) return 'Preparing the final file';
+    if (/\bff(mpeg|probe)\b/.test(s)) return 'Processing with ffmpeg';
+    return 'Running: ' + s.replace(/\s+/g, ' ').slice(0, 60);
+  }
+  return ({ Read: `Reading: ${base(s)}`, Write: `Writing: ${base(s)}`, Edit: `Editing: ${base(s)}`, MultiEdit: `Editing: ${base(s)}`,
+    Grep: 'Searching files', Glob: 'Searching files', Skill: `Reading skill: ${s}`, Task: 'Running a subtask', Agent: 'Running a subtask',
+    WebFetch: 'Reading a web page', WebSearch: 'Searching the web', AskUserQuestion: 'Asking you a question', TodoWrite: 'Updating the plan' })[name] || name;
+}
+
+// ---------- status ----------
+async function loadStatus() {
+  try { status = await api('/api/status'); } catch { $('#conn').className = 'conn bad'; $('#conn').title = 'Cannot reach the dashboard server'; return; }
+  const missing = [!status.keys.fal.set && 'fal.ai key', !status.keys.anthropic.set && 'Anthropic API key'].filter(Boolean);
+  $('#conn').className = 'conn ' + (status.ready ? 'ok' : 'bad');
+  $('#conn').title = status.ready ? 'Ready' : `Add your ${missing.join(' and ')} (click to open)`;
+  const sel = $('#model'); if (!sel.options.length) for (const m of status.models) sel.add(new Option(m.label, m.id));
+  if (!status.ready && !$('#keyDlg').open && !keyPrompted) { keyPrompted = true; openKey(); }
+  if ($('#keyDlg').open) drawKeys();
+  if (!isBusy) setAct();
+}
+let keyPrompted = false;
+function keyText(provider) {
+  const k = status?.keys?.[provider];
+  if (!k?.set) return 'Not set. The agent cannot run without it.';
+  if (k.gateway && !k.len) return 'Using gateway token from .env.';
+  return `Saved key: ${k.head}...${k.tail}, ${k.len} characters`;
+}
+function drawKeys() {
+  document.querySelectorAll('.keyrow').forEach((row) => {
+    const meta = row.querySelector('.meta');
+    if (!row.querySelector('input').value) { meta.className = 'meta' + (status?.keys?.[row.dataset.provider]?.set ? ' good' : ''); meta.textContent = keyText(row.dataset.provider); }
+  });
+}
+function openKey() {
+  document.querySelectorAll('.keyrow input').forEach((i) => i.value = '');
+  drawKeys(); $('#keyDlg').showModal();
+  const first = [...document.querySelectorAll('.keyrow')].find((r) => !status?.keys?.[r.dataset.provider]?.set) || document.querySelector('.keyrow');
+  first.querySelector('input').focus();
+}
+$('#keyBtn').onclick = openKey; $('#conn').onclick = openKey; $('#keyClose').onclick = () => $('#keyDlg').close();
+document.querySelectorAll('.keyrow').forEach((row) => {
+  const input = row.querySelector('input'), btn = row.querySelector('button'), meta = row.querySelector('.meta');
+  const provider = row.dataset.provider, name = provider === 'fal' ? 'fal.ai' : 'Anthropic';
+  input.oninput = () => { const v = input.value.trim(); meta.className = 'meta'; meta.textContent = v ? `${v.length} characters, ${v.slice(0, 4)}...${v.slice(-4)}` : keyText(provider); };
+  input.onkeydown = (e) => { if (e.key === 'Enter') btn.click(); };
+  btn.onclick = async () => {
+    meta.className = 'meta'; meta.textContent = `Testing with ${name}...`; btn.disabled = true;
+    try { const r = await api('/api/key', { method: 'POST', body: { provider, key: input.value } }); input.value = ''; meta.className = 'meta good'; meta.textContent = `Key works and is saved (${r.len} characters).`; await loadStatus(); if (status?.ready) setTimeout(() => $('#keyDlg').close(), 900); }
+    catch (e) { meta.className = 'meta bad'; meta.textContent = e.message; }
+    finally { btn.disabled = false; }
+  };
+});
+
+// ---------- jobs ----------
+async function loadJobs(selectId) {
+  jobs = await api('/api/jobs');
+  const sel = $('#jobSel'); sel.innerHTML = '';
+  if (!jobs.length) sel.add(new Option('No jobs yet', ''));
+  for (const j of jobs) sel.add(new Option(`${j.app} / ${j.name}${j.asking ? '  (question waiting)' : j.busy ? '  (working)' : ''}`, j.id));
+  $('#appNames').innerHTML = [...new Set(jobs.map((j) => j.app))].map((a) => `<option value="${esc(a)}">`).join('');
+  const want = selectId || cur?.id || localStorage.getItem('ma-job') || jobs[0]?.id;
+  if (want && jobs.some((j) => j.id === want)) sel.value = want;
+  return sel.value;
+}
+$('#jobSel').onchange = () => { if ($('#jobSel').value) openJob($('#jobSel').value); };
+function openNew(prefill) {
+  $('#nErr').textContent = ''; $('#nCode').value = '';
+  $('#nApp').value = prefill || cur?.app || '';
+  $('#newDlg').showModal(); ($('#nApp').value ? $('#nCode') : $('#nApp')).focus();
+}
+$('#newBtn').onclick = () => openNew();
+$('#nCancel').onclick = () => { $('#newDlg').close(); if (!cur) { pendingFiles = []; drawPending(); } };
+async function createJob(app, code) {
+  const r = await api('/api/jobs', { method: 'POST', body: { app, code } });
+  await loadJobs(r.id); await openJob(r.id);
+  return r.id;
+}
+$('#nOk').onclick = async () => {
+  try { await createJob($('#nApp').value, $('#nCode').value); $('#newDlg').close(); flushUploads(); }
+  catch (e) { $('#nErr').textContent = e.message; }
+};
+[$('#nApp'), $('#nCode')].forEach((el) => el.onkeydown = (e) => { if (e.key === 'Enter') $('#nOk').click(); });
+
+async function openJob(id) {
+  cur = jobs.find((j) => j.id === id); if (!cur) return;
+  localStorage.setItem('ma-job', id); $('#jobSel').value = id;
+  const d = await api(`/api/jobs/${id}/chat`);
+  $('#jt').textContent = `${cur.app} / ${cur.name}`; $('#model').value = d.model;
+  const log = $('#log'); log.innerHTML = ''; toolEls.clear(); live = null; liveText = ''; group = null; thinkingEl = null;
+  for (const ev of d.events) render(ev, true);
+  for (const a of log.querySelectorAll('.ask:not(.closed)')) if (!d.pending.includes(a.dataset.req)) closeAsk(a, null);
+  if (group) finishGroup();
+  if (!d.events.length) showEmpty();
+  setBusy(d.busy, d.startedAt);
+  scrollLog(true);
+  selMedia = null; known = null; tab = 'final'; syncTabs(); loadMedia();
+  $('#resetBtn').hidden = false;
+}
+
+function showEmpty() {
+  const app = cur ? esc(cur.app) : 'our app';
+  $('#log').innerHTML = `<div class="empty">
+    <h2>${cur ? esc(cur.name) + ' is ready' : 'Welcome'}</h2>
+    <p>Drop a competitor video and say what you want. The agent analyzes it, shares the plan, generates the shots on fal and edits them together in Remotion.</p>
+    <div class="dropzone" id="dz"><strong>Drop the competitor video here</strong>or click to choose a file</div>
+    <div class="ex">
+      <button data-t="Analyze this video: hook, shots, on-screen text, VO and why it works.">Analyze it shot by shot</button>
+      <button data-t="Analyze this video and make a similar one for ${app}. Use different talent, keep the edit and the rhythm. 9:16, English.">Analyze it and make a similar one for ${app}</button>
+      <button data-t="Analyze this video and suggest 3 different hooks for the same concept. Then make the strongest one.">Suggest 3 hooks and make the best</button>
+    </div></div>`;
+  $('#dz').onclick = () => $('#fileIn').click();
+  $('#log').querySelectorAll('.ex button').forEach((b) => b.onclick = () => { $('#input').value = b.dataset.t; autoGrow(); $('#input').focus(); });
+}
+function showWelcome() {
+  $('#log').innerHTML = `<div class="empty"><h2>Welcome</h2>
+    <p>Create a job, drop a competitor video and tell the agent what to make. Analysis, generation and editing run automatically on fal and Remotion.</p>
+    <div class="newform"><input id="wApp" placeholder="App, e.g. MyApp" list="appNames"><input id="wCode" placeholder="Code (optional)"><button class="primary" id="wOk">Create job</button></div>
+    <div class="meta bad" id="wErr"></div></div>`;
+  $('#wOk').onclick = async () => { try { await createJob($('#wApp').value, $('#wCode').value); } catch (e) { $('#wErr').textContent = e.message; } };
+}
+
+// ---------- working state ----------
+let lastAct = '';
+function setAct(text) {
+  if (text) lastAct = text;
+  $('#act').textContent = isBusy ? (lastAct || 'Thinking') : (cur ? 'Ready' : '');
+  if (thinkingEl) thinkingEl.querySelector('span').textContent = lastAct || 'Thinking';
+}
+function setBusy(b, since) {
+  isBusy = !!b;
+  $('#tally').classList.toggle('busy', isBusy);
+  $('#sendBtn').hidden = isBusy; $('#stopBtn').hidden = !isBusy;
+  clearInterval(tickT);
+  if (isBusy) {
+    busySince = since || Date.now();
+    const t = () => $('#tc').textContent = tc(Date.now() - busySince); t(); tickT = setInterval(t, 1000);
+    showThinking();
+  } else { lastAct = ''; hideThinking(); }
+  setAct();
+}
+function showThinking() {
+  if (thinkingEl || !isBusy) return;
+  thinkingEl = document.createElement('div'); thinkingEl.className = 'thinking';
+  thinkingEl.innerHTML = '<span class="bars"><i></i><i></i><i></i><i></i></span><span></span>';
+  $('#log').appendChild(thinkingEl); setAct(); scrollLog();
+}
+function hideThinking() { thinkingEl?.remove(); thinkingEl = null; }
+function keepThinkingLast() { if (thinkingEl) { $('#log').appendChild(thinkingEl); } }
+function scrollLog(force) { const l = $('#log'); if (force || l.scrollHeight - l.scrollTop - l.clientHeight < 200) l.scrollTop = l.scrollHeight; }
+
+// ---------- event rendering ----------
+function newGroup() {
+  const el = document.createElement('details'); el.className = 'steps';
+  el.innerHTML = '<summary><span class="spin"></span><span class="n">1 step</span><span class="last"></span></summary><ol></ol>';
+  $('#log').appendChild(el); group = { el, count: 0, fail: false }; return group;
+}
+function finishGroup() {
+  if (!group) return;
+  const s = group.el.querySelector('.spin'); if (s) s.outerHTML = '<span class="tick"></span>';
+  group.el.classList.toggle('fail', group.fail); group = null;
+}
+function render(ev, replay) {
+  const log = $('#log'); log.querySelector('.empty')?.remove();
+  switch (ev.t) {
+    case 'user': {
+      finishGroup(); live = null;
+      const chips = (ev.attachments || []).map((a) => `<span class="chip"><span>${esc(base(a))}</span></span>`).join('');
+      log.insertAdjacentHTML('beforeend', `<div class="msg user">${esc(ev.text)}${chips ? `<div class="chips">${chips}</div>` : ''}</div>`);
+      break;
+    }
+    case 'delta':
+      finishGroup();
+      if (!live) { live = document.createElement('div'); live.className = 'msg agent'; log.appendChild(live); liveText = ''; }
+      liveText += ev.text; live.innerHTML = md(liveText); break;
+    case 'text':
+      if (ev.sub) break;
+      finishGroup();
+      if (live) { live.innerHTML = md(ev.text); live = null; liveText = ''; }
+      else log.insertAdjacentHTML('beforeend', `<div class="msg agent">${md(ev.text)}</div>`);
+      break;
+    case 'tool': {
+      live = null;
+      if (ev.name === 'AskUserQuestion') break;
+      const g = group || newGroup(); g.count++;
+      const a = activity(ev.name, ev.summary);
+      g.el.querySelector('.n').textContent = `${g.count} step${g.count === 1 ? '' : 's'}`;
+      g.el.querySelector('.last').textContent = a;
+      const li = document.createElement('li'); li.className = 'step';
+      li.innerHTML = `<details><summary><span class="d"></span><span class="tn">${esc(ev.name)}</span><span class="ts">${esc(ev.summary || '')}</span></summary><pre>${esc(typeof ev.input === 'object' ? JSON.stringify(ev.input, null, 2) : ev.input)}</pre></details>`;
+      g.el.querySelector('ol').appendChild(li); toolEls.set(ev.toolId, li);
+      if (!replay) setAct(a);
+      break;
+    }
+    case 'tool_result': {
+      const li = toolEls.get(ev.toolId); if (!li) break;
+      li.classList.add(ev.isError ? 'bad' : 'ok');
+      li.querySelector('details').insertAdjacentHTML('beforeend', `<pre>${esc(ev.text || '(empty output)')}</pre>`);
+      if (ev.isError && group) group.fail = true;
+      if (!replay) loadMediaSoon();
+      break;
+    }
+    case 'question': {
+      finishGroup();
+      const el = document.createElement('form'); el.className = 'ask'; el.dataset.req = ev.reqId;
+      el.innerHTML = '<h4>The agent has a question</h4>' + ev.questions.map((q, i) => `<div class="qa" data-q="${esc(q.question)}">
+        <div class="q">${esc(q.question)}</div>
+        ${(q.options || []).map((o) => `<label class="opt"><input type="${q.multiSelect ? 'checkbox' : 'radio'}" name="q${i}" value="${esc(o.label)}"><span>${esc(o.label)}<small>${esc(o.description || '')}</small></span></label>`).join('')}
+        <input class="other" placeholder="Or type another answer"></div>`).join('') +
+        '<div class="acts"><button class="primary" type="submit">Answer</button><button type="button" data-skip>You decide</button></div>';
+      const send = async (answers) => { el.querySelectorAll('button,input').forEach((x) => x.disabled = true); try { await api('/api/answer', { method: 'POST', body: { reqId: ev.reqId, answers } }); } catch { closeAsk(el, null); } };
+      el.onsubmit = (e) => {
+        e.preventDefault(); const answers = {};
+        el.querySelectorAll('.qa').forEach((qa) => {
+          const picked = [...qa.querySelectorAll('input:checked')].map((x) => x.value);
+          const other = qa.querySelector('.other').value.trim(); if (other) picked.push(other);
+          if (picked.length) answers[qa.dataset.q] = picked.join(', ');
+        });
+        send(answers);
+      };
+      el.querySelector('[data-skip]').onclick = () => send({});
+      log.appendChild(el);
+      if (!replay) setAct('Waiting for your answer');
+      break;
+    }
+    case 'question_done': { const el = log.querySelector(`.ask[data-req="${ev.reqId}"]`); if (el) closeAsk(el, ev.answers); break; }
+    case 'result': {
+      finishGroup(); live = null;
+      log.insertAdjacentHTML('beforeend', `<div class="done">Done: ${ev.turns} turns, ${dur(ev.ms)}.${typeof ev.cost === 'number' ? ` Estimated fal spend for this job: ${usd(ev.cost)}.` : ''}</div>`);
+      if (ev.isError && ev.error) log.insertAdjacentHTML('beforeend', `<div class="err">${esc(ev.error)}</div>`);
+      break;
+    }
+    case 'error': finishGroup(); live = null; log.insertAdjacentHTML('beforeend', `<div class="err">${esc(ev.text)}</div>`); break;
+    case 'note': finishGroup(); log.insertAdjacentHTML('beforeend', `<div class="note">${esc(ev.text)}</div>`); break;
+  }
+  if (!replay) { keepThinkingLast(); scrollLog(); }
+}
+function closeAsk(el, answers) {
+  el.classList.add('closed'); el.querySelectorAll('.acts,.qa').forEach((x) => x.remove());
+  el.querySelector('h4').textContent = answers ? 'Answered' : 'The agent decided on its own';
+  if (answers) el.insertAdjacentHTML('beforeend', Object.entries(answers).map(([q, a]) => `<div class="chosen">${esc(q)} <strong>${esc(a)}</strong></div>`).join(''));
+}
+
+// ---------- live stream ----------
+function connect() {
+  const es = new EventSource('/api/events');
+  es.onmessage = (m) => {
+    const ev = JSON.parse(m.data);
+    if (ev.t === 'status') return loadStatus();
+    if (['busy', 'question', 'question_done'].includes(ev.t)) loadJobs();
+    if (!cur || ev.job !== cur.id) return;
+    if (ev.t === 'busy') { if (!ev.busy) { finishGroup(); loadMedia(); loadStatus(); } setBusy(ev.busy, ev.startedAt); return; }
+    render(ev, false);
+  };
+  es.onerror = () => { $('#conn').className = 'conn bad'; $('#conn').title = 'Cannot reach the dashboard server'; };
+  es.onopen = () => loadStatus();
+}
+
+// ---------- send ----------
+async function send() {
+  if (!cur) { openNew(); return; }
+  const text = $('#input').value.trim();
+  if (!text) { $('#input').focus(); return; }
+  if (pendingFiles.some((f) => !f.path)) { alert('Wait a few seconds for the upload to finish before sending.'); return; }
+  try {
+    await api(`/api/jobs/${cur.id}/message`, { method: 'POST', body: { text, attachments: pendingFiles.map((f) => f.path), model: $('#model').value } });
+    $('#input').value = ''; pendingFiles = []; drawPending(); autoGrow();
+  } catch (e) { $('#log').insertAdjacentHTML('beforeend', `<div class="err">${esc(e.message)}</div>`); scrollLog(true); }
+}
+$('#sendBtn').onclick = send;
+$('#input').onkeydown = (e) => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(); } };
+const autoGrow = () => { const t = $('#input'); t.style.height = 'auto'; t.style.height = Math.min(t.scrollHeight, 220) + 'px'; };
+$('#input').oninput = autoGrow;
+$('#stopBtn').onclick = () => cur && api(`/api/jobs/${cur.id}/stop`, { method: 'POST' });
+$('#model').onchange = () => cur && api(`/api/jobs/${cur.id}/settings`, { method: 'POST', body: { model: $('#model').value } });
+$('#resetBtn').onclick = async () => {
+  if (!cur || !confirm('The agent will forget this job\'s conversation. The files stay where they are. Reset?')) return;
+  try { await api(`/api/jobs/${cur.id}/reset`, { method: 'POST' }); } catch (e) { alert(e.message); }
+};
+
+// ---------- uploads ----------
+function drawPending() {
+  $('#pend').innerHTML = pendingFiles.map((f, i) => `<span class="chip" title="${esc(f.name)}"><span>${esc(f.name)}${f.path ? '' : ` ${f.pct || 0}%`}</span><button data-i="${i}" aria-label="Remove">×</button></span>`).join('');
+  $('#pend').querySelectorAll('button').forEach((b) => b.onclick = () => { pendingFiles.splice(+b.dataset.i, 1); drawPending(); });
+}
+function uploadOne(f) {
+  const item = { name: f.name, pct: 0, file: f }; pendingFiles.push(item); drawPending();
+  if (!cur) return;
+  startUpload(item);
+}
+function startUpload(item) {
+  const xhr = new XMLHttpRequest();
+  xhr.open('POST', `/api/jobs/${cur.id}/upload?path=Ref.Videos&name=${encodeURIComponent(item.name)}`);
+  xhr.upload.onprogress = (e) => { if (e.lengthComputable) { item.pct = Math.round(e.loaded / e.total * 100); drawPending(); } };
+  xhr.onload = () => {
+    try { const r = JSON.parse(xhr.responseText); if (xhr.status === 200) { item.path = r.path; item.name = base(r.path); loadMedia(); } else throw new Error(r.error); }
+    catch (e) { alert(`Could not upload ${item.name}: ${e.message}`); pendingFiles = pendingFiles.filter((x) => x !== item); }
+    drawPending();
+  };
+  xhr.onerror = () => { alert(`Could not upload ${item.name}.`); pendingFiles = pendingFiles.filter((x) => x !== item); drawPending(); };
+  xhr.send(item.file);
+}
+function flushUploads() { for (const it of pendingFiles) if (!it.path && !it.started) { it.started = true; startUpload(it); } }
+function addFiles(list) {
+  const files = [...list]; if (!files.length) return;
+  files.forEach(uploadOne);
+  if (!cur) openNew(); else pendingFiles.forEach((p) => p.started = true);
+  $('#input').focus();
+}
+$('#attachBtn').onclick = () => $('#fileIn').click();
+$('#fileIn').onchange = () => { addFiles($('#fileIn').files); $('#fileIn').value = ''; };
+let dragN = 0;
+window.addEventListener('dragenter', (e) => { if ([...e.dataTransfer.types].includes('Files')) { dragN++; document.body.classList.add('dragging'); } });
+window.addEventListener('dragleave', () => { dragN = Math.max(0, dragN - 1); if (!dragN) document.body.classList.remove('dragging'); });
+window.addEventListener('dragover', (e) => e.preventDefault());
+window.addEventListener('drop', (e) => { e.preventDefault(); dragN = 0; document.body.classList.remove('dragging'); if (e.dataTransfer.files.length) addFiles(e.dataTransfer.files); });
+
+// ---------- outputs ----------
+const GROUPS = { final: ['Final'], gen: ['Shots', 'Asset', 'Audio'], ref: ['Ref.Videos'], work: ['Work'] };
+let mediaT = null;
+const loadMediaSoon = () => { clearTimeout(mediaT); mediaT = setTimeout(loadMedia, 800); };
+function syncTabs() { $('#tabs').querySelectorAll('button').forEach((b) => b.classList.toggle('on', b.dataset.g === tab)); }
+$('#tabs').querySelectorAll('button').forEach((b) => b.onclick = () => { tab = b.dataset.g; syncTabs(); drawGrid(); });
+async function loadMedia() {
+  if (!cur) return;
+  let d; try { d = await api(`/api/jobs/${cur.id}/media`); } catch { return; }
+  const before = media.map((m) => m.path + m.mtime).join();
+  media = d.items; $('#jobCost').textContent = d.cost ? `Est. fal spend ${usd(d.cost)}` : '';
+  if (before === media.map((m) => m.path + m.mtime).join() && $('#grid').childElementCount) return;
+  if (known) {
+    const fresh = media.filter((m) => !known.has(m.path) && ['Final', 'Shots', 'Asset'].includes(m.group) && m.kind !== 'audio');
+    const pick = fresh.find((m) => m.group === 'Final') || fresh[0];
+    if (pick) { selMedia = null; tab = pick.group === 'Final' ? 'final' : 'gen'; syncTabs(); show(pick); }
+  }
+  known = new Set(media.map((m) => m.path));
+  if (!selMedia) {
+    const pick = media.find((m) => m.group === 'Final' && m.kind === 'video') || media.find((m) => m.kind === 'video' && m.group !== 'Work') || media[0];
+    if (pick) { tab = Object.keys(GROUPS).find((k) => GROUPS[k].includes(pick.group)) || 'gen'; syncTabs(); show(pick); }
+  }
+  drawGrid();
+}
+const fileUrl = (p) => `/api/jobs/${cur.id}/file?path=${encodeURIComponent(p)}`;
+function drawGrid() {
+  const g = $('#grid'); const items = media.filter((m) => GROUPS[tab].includes(m.group));
+  if (!items.length) { g.innerHTML = `<div class="gempty">${{ final: 'The final video will show up here.', gen: 'Shots, images and audio generated on fal will show up here.', ref: 'Competitor and reference videos you upload go here.', work: 'Draft renders and analysis frames go here.' }[tab]}</div>`; return; }
+  g.innerHTML = items.map((m) => {
+    const u = fileUrl(m.path);
+    const inner = m.kind === 'video' ? `<video src="${u}#t=0.5" muted preload="metadata" playsinline></video>` : m.kind === 'image' ? `<img src="${u}" loading="lazy" alt="">` : '<div class="aud">Audio</div>';
+    return `<button class="th${selMedia === m.path ? ' on' : ''}" data-p="${esc(m.path)}" title="${esc(m.path)}">${inner}<span class="cap">${esc(base(m.path))}</span></button>`;
+  }).join('');
+  g.querySelectorAll('.th').forEach((b) => {
+    const m = media.find((x) => x.path === b.dataset.p);
+    b.onclick = () => show(m);
+    const v = b.querySelector('video');
+    if (v) { b.onmouseenter = () => v.play().catch(() => {}); b.onmouseleave = () => { v.pause(); v.currentTime = 0.5; }; }
+  });
+}
+function show(m) {
+  if (!m) return; selMedia = m.path;
+  const u = fileUrl(m.path);
+  $('#mName').textContent = m.path; $('#dlBtn').hidden = false; $('#dlBtn').href = u; $('#dlBtn').download = base(m.path); $('#revealBtn').hidden = false;
+  $('#screen').innerHTML = m.kind === 'video' ? `<video src="${u}" controls playsinline></video>` : m.kind === 'image' ? `<img src="${u}" alt="">` : `<audio src="${u}" controls></audio>`;
+  $('#grid').querySelectorAll('.th').forEach((b) => b.classList.toggle('on', b.dataset.p === m.path));
+}
+$('#revealBtn').onclick = () => cur && selMedia && api(`/api/jobs/${cur.id}/reveal?path=${encodeURIComponent(selMedia)}`, { method: 'POST' });
+
+// ---------- start ----------
+(async () => {
+  await loadStatus();
+  const id = await loadJobs();
+  if (id) await openJob(id); else { showWelcome(); setBusy(false); drawGrid(); }
+  connect();
+  setInterval(loadStatus, 30000);
+})();
+</script>
+</body>
+</html>

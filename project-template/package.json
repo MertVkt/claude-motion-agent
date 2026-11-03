@@ -1,0 +1,31 @@
+{
+  "name": "motion-agent-job",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Remotion + ffmpeg hybrid ad production template (claude-motion-agent)",
+  "scripts": {
+    "studio": "remotion studio",
+    "render": "remotion render",
+    "still": "remotion still",
+    "compositions": "remotion compositions",
+    "upgrade": "remotion upgrade"
+  },
+  "dependencies": {
+    "@remotion/bundler": "4.0.524",
+    "@remotion/cli": "4.0.524",
+    "@remotion/google-fonts": "4.0.524",
+    "@remotion/media-utils": "4.0.524",
+    "@remotion/renderer": "4.0.524",
+    "@remotion/transitions": "4.0.524",
+    "@remotion/zod-types": "4.0.524",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "remotion": "4.0.524",
+    "zod": "4.5.4"
+  },
+  "devDependencies": {
+    "@types/react": "19.3.0",
+    "@types/node": "22.13.0",
+    "typescript": "5.7.3"
+  }
+}

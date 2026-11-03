@@ -1,0 +1,28 @@
+# --- Secret keys: NEVER committed ---
+.env
+.env.*
+!.env.example
+API_Keys/
+*.rtf
+
+# --- System / editor ---
+.DS_Store
+.vscode/
+.idea/
+
+# --- Node / Remotion ---
+node_modules/
+out/
+build/
+.remotion/
+npm-debug.log*
+
+# --- Python ---
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# --- Heavy media outputs (optional) ---
+Work/**/*.mov
+Work/**/*.mp4
