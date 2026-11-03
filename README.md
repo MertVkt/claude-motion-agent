@@ -6,6 +6,12 @@ Drop a reference ad into the dashboard and describe what you want. The agent bre
 shot, generates the live-action shots, voiceover and sound on fal.ai, builds the text, UI and transitions
 in Remotion code, checks its own work and delivers a platform-ready master.
 
+<p align="center">
+  <img src="docs/demo.gif" width="300" alt="A 25 second vertical game ad made by the agent">
+  <br>
+  <sub>A 25 second game ad made by the agent. <a href="docs/demo.mp4">Watch with sound</a></sub>
+</p>
+
 ```
 reference ad ──► fal analyze ──► shot plan ──► fal run (stills, video, VO, SFX)
                                                      │
